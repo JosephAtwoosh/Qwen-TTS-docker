@@ -205,10 +205,15 @@ The workflow is: CI builds → GHCR public → Vast template → rent → fetch 
 ```bash
 node tools/vast.js search "RTX 4090,RTX 5090,A6000" 24000 60
 node tools/vast.js rent --offer <id> --image ghcr.io/josephatwoosh/qwen-tts-docker:latest \
-  --disk 60 --env TTS_API_KEY=... --port 8000:8000 --yes
+  --disk 60 --max-inet 4 --env TTS_API_KEY=... --port 8000:8000 --yes
 ```
 
-`rent` refuses without `--yes`; `destroy` refuses without `--yes` too.
+Both commands enforce a **$4/TB** ceiling on internet transfer in each
+direction; the columns are shown in `search`, and `rent` refuses an offer that
+violates it. `rent` refuses without `--yes`; `destroy` refuses without `--yes`
+too. Vast's launcher ignores the image `CMD`, so the instance needs the
+template's on-start script (see [docs/VAST.md](docs/VAST.md)) — otherwise the
+service never starts.
 
 ---
 

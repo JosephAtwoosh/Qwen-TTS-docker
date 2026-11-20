@@ -30,7 +30,26 @@ If you must keep it private, create a Vast registry credential for
 `ghcr.io` with a GitHub token that can read packages, and attach it to the
 template. That is more setup than most runs justify.
 
+### Transfer cost
+
+GPU price is not the whole price. Vast hosts bill ingress/egress separately,
+and the spread is huge: the first host this project rented was **~$16/TB down,
+~$17/TB up**; the one it settled on was **$1.33/TB down, $2.67/TB up**. Pulling
+the 4.8 GB image and 4 GB of weights is ~9 GB, so the difference between those
+hosts is roughly $0.30 per boot — small, but it compounds and the user's rule
+here is **under $4/TB in both directions**.
+
+`tools/vast.js search` filters on `internet_down_cost_per_tb` and
+`internet_up_cost_per_tb` and shows both columns. `rent` re-checks the offer and
+refuses anything at or above `--max-inet` (default 4) unless `--allow-inet` is
+passed. Do not bypass it without reading the two columns.
+
 ## 2. The template
+
+**Vast's launcher (`/.launch`) replaces the image entrypoint.** The image's
+`CMD ["serve"]` does not run on a Vast instance; without an on-start script the
+container sits there with SSH only and `/health` is unreachable. The on-start
+script is mandatory, and Vast writes it to `/app/onstart.sh`.
 
 Fields in the Vast UI (*Templates → New Template*):
 
@@ -73,13 +92,15 @@ node tools/vast.js rent \
   --image ghcr.io/josephatwoosh/qwen-tts-docker:latest \
   --disk 60 \
   --label qwen-tts \
+  --max-inet 4 \
   --env TTS_API_KEY=replace-with-a-long-random-string \
   --port 8000:8000 \
   --yes
 ```
 
-`rent` spends money and refuses without `--yes`. Check the offer's driver
-column: it must be ≥ 525 for the CUDA 12.x image. Prefer verified hosts.
+`rent` spends money and refuses without `--yes`; it also refuses an offer whose
+transfer rate is not under `--max-inet` USD/TB both ways. Check the offer's
+driver column: it must be ≥ 525 for the CUDA 12.x image. Prefer verified hosts.
 
 A 4090 at roughly $0.30–0.45/h is the sweet spot. The 1.7B model does not need
 an A100; 24 GB is plenty.
@@ -100,6 +121,18 @@ qwen-tts-entrypoint doctor
 `doctor` reports the GPU, VRAM, torch/CUDA, weights, voice count and API key.
 If the on-start script is still downloading, `doctor` fails on the weights;
 wait and re-run.
+
+**Environment quirk:** Vast injects the template env into PID 1, but SSH
+sessions start without it. So `env | grep TTS` in an SSH shell can be empty
+while the service started by on-start has the key. Check the real container env
+with:
+
+```bash
+tr '\0' '\n' < /proc/1/environ | grep -E 'TTS_API_KEY|PRELOAD_MODEL'
+```
+
+If you start the service by hand, export `TTS_API_KEY` in that same command or
+it will run open.
 
 ## 5. Voices
 

@@ -48,6 +48,8 @@ function parseArgs(argv) {
     dryRun: false,
     keepRaw: false,
     noCache: false,
+    id: "",
+    sampleId: "",
     ffmpeg: process.env.FFMPEG || "ffmpeg",
     transcripts: "",
     elevenKeyFile: process.env.ELEVENLABS_KEY_FILE || "",
@@ -70,6 +72,8 @@ function parseArgs(argv) {
       case "--source": args.source = next(); break;
       case "--limit": args.limit = Number(next()); break;
       case "--names": args.names = next().split(",").map((s) => s.trim()).filter(Boolean); break;
+      case "--id": args.id = next(); break;
+      case "--sample-id": args.sampleId = next(); break;
       case "--transcripts": args.transcripts = next(); break;
       case "--ffmpeg": args.ffmpeg = next(); break;
       case "--eleven-key-file": args.elevenKeyFile = next(); break;
@@ -380,7 +384,7 @@ async function main() {
 
   for (const voice of selected) {
     const name = String(voice.name || voice.voice_id);
-    let id = slug(name);
+    let id = args.id ? slug(args.id) : slug(name);
     if (usedSlugs.has(id)) {
       const existing = path.join(args.voicesDir, id, "profile.json");
       let same = false;
@@ -421,7 +425,10 @@ async function main() {
       // Prefer an original sample; fall back to the public preview.
       const samples = Array.isArray(voice.samples) ? voice.samples : [];
       if (args.source !== "preview" && samples.length) {
-        const sample = samples.slice().sort((a, b) => (b.size_bytes || 0) - (a.size_bytes || 0))[0];
+        const sample = args.sampleId
+          ? samples.find((s) => (s.sample_id || s.sampleId) === args.sampleId)
+          : samples.slice().sort((a, b) => (b.size_bytes || 0) - (a.size_bytes || 0))[0];
+        if (!sample) throw new Error(`sample ${args.sampleId} not found on ${name}`);
         const sampleId = sample.sample_id || sample.sampleId;
         if (sampleId) {
           const url = `${API}/voices/${voice.voice_id}/samples/${sampleId}/audio`;

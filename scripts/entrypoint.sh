@@ -3,6 +3,10 @@
 # executed directly, so `docker run --rm image bash` still works.
 set -euo pipefail
 
+# Vast's launcher and `docker exec` sessions can start in /root; the package is
+# at /app, so never rely on the caller's working directory.
+cd /app
+
 cmd="${1:-serve}"
 case "$cmd" in
   serve)

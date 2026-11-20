@@ -17,7 +17,6 @@ path = snapshot_download(
     local_dir=dest,
     token=os.environ.get("HF_TOKEN") or None,
     max_workers=4,
-    resume_download=True,
 )
 print(f"done: {path}")
 PY

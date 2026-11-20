@@ -100,6 +100,8 @@ function parseFlags(argv) {
     else if (arg === "--onstart") flags.onstart = argv[++i];
     else if (arg === "--name") flags.name = argv[++i];
     else if (arg === "--json") flags.json = argv[++i];
+    else if (arg === "--max-inet") flags.maxInet = Number(argv[++i]);
+    else if (arg === "--allow-inet") flags.allowInet = true;
     else flags._.push(arg);
   }
   return flags;
@@ -120,9 +122,33 @@ function envMap(list) {
   return env;
 }
 
+/** Vast returns both a $/GB field and an explicit $/TB field; prefer the latter. */
+function perTb(offer, tbKey, gbKey) {
+  if (typeof offer[tbKey] === "number") return offer[tbKey];
+  return (offer[gbKey] || 0) * 1024;
+}
+
+async function offerById(id, key) {
+  // Vast's bundle filter has no `id` predicate, so fetch the same pool the
+  // `search` command uses and match locally.
+  const query = {
+    gpu_name: { in: ["RTX 4090", "RTX 5090", "A6000", "L40S"] },
+    num_gpus: { gte: 1 },
+    gpu_ram: { gte: 23000 },
+    disk_space: { gte: 60 },
+    rentable: { eq: true },
+    verified: { eq: true },
+    type: "ondemand",
+    limit: 1000,
+  };
+  const r = await request("POST", "/api/v0/bundles/", query, key);
+  if (r.status !== 200) return null;
+  return (r.body.offers || []).find((o) => String(o.id) === String(id)) || null;
+}
+
 function scp(id, local, remote) {
   const key = needKey();
-  request("GET", "/api/v0/instances/", undefined, key.key).then((r) => {
+  request("GET", "/api/v1/instances/", undefined, key.key).then((r) => {
     const list = r.body.instances || r.body;
     const inst = (Array.isArray(list) ? list : []).find((i) => String(i.id) === String(id));
     if (!inst) {
@@ -160,7 +186,7 @@ async function main() {
 
     case "instances": {
       const key = needKey();
-      const r = await request("GET", "/api/v0/instances/", undefined, key.key);
+      const r = await request("GET", "/api/v1/instances/", undefined, key.key);
       const list = r.body.instances || r.body;
       if (!Array.isArray(list)) {
         console.log(JSON.stringify(r.body, null, 2).slice(0, 4000));
@@ -193,26 +219,68 @@ async function main() {
         verified: { eq: true },
         type: "ondemand",
         order: [["dph_total", "asc"]],
-        limit: 12,
+        limit: 200,
       };
       const r = await request("POST", "/api/v0/bundles/", query, findKey()?.key);
       if (r.status !== 200) {
         console.error("status", r.status, JSON.stringify(r.body).slice(0, 500));
         process.exit(1);
       }
+      const maxInet = flags.maxInet ?? 4;
+      const offers = (r.body.offers || [])
+        .map((o) => ({
+          ...o,
+          downTb: perTb(o, "internet_down_cost_per_tb", "inet_down_cost"),
+          upTb: perTb(o, "internet_up_cost_per_tb", "inet_up_cost"),
+        }))
+        .filter((o) => o.downTb < maxInet && o.upTb < maxInet);
+      if (!offers.length) {
+        console.error(`No offers under $${maxInet}/TB both ways. Raise with --max-inet.`);
+        process.exit(1);
+      }
       console.table(
-        (r.body.offers || []).map((o) => ({
+        offers.slice(0, 15).map((o) => ({
           offer: o.id,
           gpu: `${o.num_gpus}x ${o.gpu_name}`,
           vram_gb: Math.round(o.gpu_total_ram / 1024),
           ram_gb: Math.round(o.cpu_ram / 1024),
           disk_gb: Math.round(o.disk_space),
-          cuda: o.cuda_max_good,
+          down_tb: Number(o.downTb.toFixed(2)),
+          up_tb: Number(o.upTb.toFixed(2)),
+          mbps: `${Math.round(o.inet_down)}/${Math.round(o.inet_up)}`,
           driver: o.driver_version,
           usd_hr: Number(o.dph_total.toFixed(3)),
         })),
       );
-      console.log("\nPick an offer whose driver is >= 525 (CUDA 12.x).");
+      console.log(`\nFiltered to < $${maxInet}/TB in both directions. Driver must be >= 525 (CUDA 12.x).`);
+      break;
+    }
+
+    case "offer": {
+      const key = needKey();
+      const o = await offerById(flags._[0], key.key);
+      if (!o) {
+        console.error(`no offer ${flags._[0]}`);
+        process.exit(1);
+      }
+      console.log(
+        JSON.stringify(
+          {
+            id: o.id,
+            gpu: o.gpu_name,
+            vram_gb: Math.round(o.gpu_total_ram / 1024),
+            dph: o.dph_total,
+            down_tb: perTb(o, "internet_down_cost_per_tb", "inet_down_cost"),
+            up_tb: perTb(o, "internet_up_cost_per_tb", "inet_up_cost"),
+            down_mbps: o.inet_down,
+            up_mbps: o.inet_up,
+            driver: o.driver_version,
+            geo: o.geolocation,
+          },
+          null,
+          2,
+        ),
+      );
       break;
     }
 
@@ -224,6 +292,29 @@ async function main() {
       }
       if (!flags.yes) {
         console.error("Refusing to spend money without --yes");
+        process.exit(2);
+      }
+      const maxInet = flags.maxInet ?? 4;
+      const offer = await offerById(flags.offer, key.key);
+      if (!offer) {
+        console.error(
+          `Could not read offer ${flags.offer}. Run \`search\` and pass --allow-inet ` +
+            "only if you have checked the transfer rate yourself.",
+        );
+        process.exit(2);
+      }
+      const downTb = perTb(offer, "internet_down_cost_per_tb", "inet_down_cost");
+      const upTb = perTb(offer, "internet_up_cost_per_tb", "inet_up_cost");
+      console.log(
+        `offer ${flags.offer}: $${Number(offer.dph_total).toFixed(3)}/h, ` +
+          `transfer down $${downTb.toFixed(2)}/TB up $${upTb.toFixed(2)}/TB`,
+      );
+      if (!flags.allowInet && (downTb >= maxInet || upTb >= maxInet)) {
+        console.error(
+          `Refusing: transfer is not under $${maxInet}/TB both ways ` +
+            `(down $${downTb.toFixed(2)}, up $${upTb.toFixed(2)}). ` +
+            "Pick another offer, or override with --allow-inet.",
+        );
         process.exit(2);
       }
       const body = {
@@ -269,7 +360,7 @@ async function main() {
 
     case "ssh": {
       const key = needKey();
-      const r = await request("GET", "/api/v0/instances/", undefined, key.key);
+      const r = await request("GET", "/api/v1/instances/", undefined, key.key);
       const list = r.body.instances || r.body;
       const inst = (Array.isArray(list) ? list : []).find((i) => String(i.id) === String(flags._[0]));
       if (!inst) {
@@ -292,6 +383,20 @@ async function main() {
         process.exit(2);
       }
       scp(id, local, remote);
+      break;
+    }
+
+    case "stop":
+    case "start": {
+      const key = needKey();
+      const id = flags._[0];
+      if (!id) {
+        console.error(`${cmd} <instance_id>`);
+        process.exit(2);
+      }
+      const state = cmd === "stop" ? "stopped" : "running";
+      const r = await request("PUT", `/api/v0/instances/${id}/`, { state }, key.key);
+      console.log(`${cmd} ${id} -> ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
       break;
     }
 

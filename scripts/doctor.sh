@@ -2,6 +2,9 @@
 # Preflight for a rented GPU. Run before spending an hour on a broken host.
 set -uo pipefail
 
+# Vast starts SSH sessions in /root; `app` must be importable.
+cd /app
+
 fail=0
 ok()   { printf '  ok    %s\n' "$*"; }
 bad()  { printf '  FAIL  %s\n' "$*"; fail=$((fail + 1)); }
@@ -73,7 +76,8 @@ command -v ffmpeg >/dev/null 2>&1 && ok "ffmpeg $(ffmpeg -version 2>/dev/null | 
 command -v node >/dev/null 2>&1 && ok "node $(node --version)" || warn "node missing (voice import unavailable in-container)"
 
 echo "== configuration =="
-if [[ -n "${TTS_API_KEY:-}" ]]; then
+# Vast injects the template env into PID 1 but SSH sessions start without it.
+if [[ -n "${TTS_API_KEY:-}" ]] || tr '\0' '\n' < /proc/1/environ 2>/dev/null | grep -q '^TTS_API_KEY=.'; then
   ok "TTS_API_KEY is set"
 else
   warn "TTS_API_KEY is empty — anyone who reaches the port can spend your GPU time"

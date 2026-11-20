@@ -14,5 +14,5 @@
     "VOICES_DIR": "/voices",
     "OUTPUT_DIR": "/output"
   },
-  "onstart": "qwen-tts-entrypoint serve"
+  "onstart": "test -f /models/Qwen3-TTS-12Hz-1.7B-Base/model.safetensors || qwen-tts-entrypoint download-models; qwen-tts-entrypoint serve"
 }
