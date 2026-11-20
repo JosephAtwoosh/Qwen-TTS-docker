@@ -17,6 +17,13 @@ case "$cmd" in
         nohup /app/scripts/gpu-probe.sh >/dev/null 2>&1 &
       fi
     fi
+    if [[ "${GPU_WATCHDOG:-1}" == "1" ]] && command -v python3 >/dev/null 2>&1; then
+      if ! command -v pgrep >/dev/null 2>&1 \
+        || ! pgrep -f '[g]pu_watchdog.py' >/dev/null 2>&1; then
+        WATCH_INTERVAL="${GPU_PROBE_INTERVAL:-120}" \
+          nohup python3 /app/scripts/gpu_watchdog.py >/dev/null 2>&1 &
+      fi
+    fi
     exec python -m app.server
     ;;
   import-voices)

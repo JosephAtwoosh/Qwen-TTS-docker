@@ -6,7 +6,7 @@
 # the whole render and read afterwards.
 set -uo pipefail
 
-INTERVAL="${GPU_PROBE_INTERVAL:-180}"
+INTERVAL="${GPU_PROBE_INTERVAL:-120}"
 OUT="${GPU_PROBE_OUT:-/output/gpu-probe.csv}"
 
 mkdir -p "$(dirname "$OUT")"

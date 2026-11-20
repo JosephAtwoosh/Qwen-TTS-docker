@@ -139,7 +139,7 @@ it will run open.
 ### GPU sampling
 
 `serve` starts `scripts/gpu-probe.sh` automatically. It appends one `nvidia-smi`
-row every `GPU_PROBE_INTERVAL` seconds (default **180**) to
+row every `GPU_PROBE_INTERVAL` seconds (default **120**) to
 `/output/gpu-probe.csv`:
 
 ```text
@@ -149,6 +149,13 @@ timestamp,name,util_pct,mem_used_mib,mem_total_mib,temp_c,power_w
 
 It is independent of the SSH session, so it keeps sampling through the render.
 Set `GPU_PROBE=0` to disable, or `GPU_PROBE_INTERVAL=60` for finer detail.
+
+`serve` also starts `scripts/gpu_watchdog.py`, which writes one JSON object per
+interval to `/output/gpu-watchdog.jsonl` with the GPU line, server process
+count, `/health` code, the latest job id/status/age and the model-call count
+(`batches`). Set `GPU_WATCHDOG=0` to disable. This is the file to read after a
+pipe failure: it shows whether the job kept advancing while the SSH session was
+blocked.
 
 ## 5. Voices
 

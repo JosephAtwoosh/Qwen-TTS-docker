@@ -168,29 +168,28 @@ This repository deliberately **does not modify the PHP studio**; it is the
 service the studio calls. The studio already accepts a WAV per shot
 (`shots.audio_file`, served by `?r=media&audio=<id>`), so the integration is:
 
-1. On `?r=settings`, store the Vast endpoint and the API key. Two settings keys
-   are enough: `tts_url`, `tts_key` (the page already has a settings form).
+1. On `?r=settings`, store the endpoint and the API key (`tts_url`, `tts_key`).
 2. For each character asset, store the voice slug (`henry`, `petra`, …).
-3. On "generate", POST one line to `/v1/tts`, or a scene to
-   `/v1/soundtracks?wait=1`, then save `mix.wav` or the chosen stem as the
-   shot's audio.
+3. On "generate", POST one line to `/v1/tts`, then save the WAV with
+   `store_media()` and attach it with `shot_audio_set()`.
 
-A minimal PHP call:
+The complete one-turn design — measured latency, SSH tunnel vs public port,
+the missing `dialogue`/`speaker` columns, queue vs synchronous, caching and
+failure handling — is in [docs/STUDIO.md](docs/STUDIO.md). A tested reference
+client is [examples/php/TtsClient.php](examples/php/TtsClient.php):
 
 ```php
-$ch = curl_init($ttsUrl . '/v1/tts');
-curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $ttsKey, 'Content-Type: application/json'],
-    CURLOPT_POSTFIELDS => json_encode(['voice' => 'henry', 'text' => $line], JSON_UNESCAPED_UNICODE),
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => 120,
-]);
-$wav = curl_exec($ch);
+$tts = new TtsClient(setting('tts_url'), setting('tts_key'), 120);
+if (!$tts->isReady()) { throw new RuntimeException('TTS is not loaded yet'); }
+$result = $tts->synthesize($turn['text'], $turn['voice_id'], (int) $turn['seed'], (float) $shot['duration_s']);
+file_put_contents($tmp, $result['wav']);
+$stored = store_media($tmp, 'audio/wav');
+shot_audio_set($shotId, $stored, audio_duration(media_path($stored['file']), 'audio/wav'));
 ```
 
-Because the PHP built-in server is single-threaded, prefer the per-shot call
-(seconds) over a whole-scene synchronous call (tens of seconds).
+A one-turn call measured 13–20 s on the 4090. Because the PHP built-in server is
+single-threaded, a synchronous call blocks every other page for that long; the
+design doc recommends a small SQLite queue + CLI worker if that is too much.
 
 ---
 
