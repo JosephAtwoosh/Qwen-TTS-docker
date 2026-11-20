@@ -69,10 +69,12 @@ Fields in the Vast UI (*Templates → New Template*):
 On-start script (idempotent: downloads once, then always serves):
 
 ```bash
-test -f /models/Qwen3-TTS-12Hz-1.7B-Base/model.safetensors \
-  || qwen-tts-entrypoint download-models
-qwen-tts-entrypoint serve
+bash /app/scripts/vast-onstart.sh
 ```
+
+That script refuses to expose an open API when `TTS_API_KEY` is empty,
+downloads the checkpoint if `/models` is empty, logs a doctor preflight, then
+starts the service. Set `ALLOW_OPEN=1` only for a private debug instance.
 
 `/models`, `/voices` and `/output` are declared volumes. On a Vast instance
 they live on the instance's disk, which survives a stop but **not** a destroy.
