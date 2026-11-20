@@ -1,0 +1,37 @@
+name: qwen-tts
+
+services:
+  qwen-tts:
+    build:
+      context: .
+    image: ${QWEN_TTS_IMAGE:-ghcr.io/josephatwoosh/qwen-tts-docker:latest}
+    env_file:
+      - .env
+    environment:
+      MODEL_ID: /models/Qwen3-TTS-12Hz-1.7B-Base
+      VOICES_DIR: /voices
+      OUTPUT_DIR: /output
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - "${MODELS_HOST_DIR:-./models}:/models"
+      - "${VOICES_HOST_DIR:-./voices}:/voices"
+      - "${OUTPUT_HOST_DIR:-./output}:/output"
+    shm_size: "8gb"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  downloader:
+    profiles: ["download"]
+    image: ${QWEN_TTS_IMAGE:-ghcr.io/josephatwoosh/qwen-tts-docker:latest}
+    entrypoint: ["/app/scripts/download-models.sh"]
+    volumes:
+      - "${MODELS_HOST_DIR:-./models}:/models"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}

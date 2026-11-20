@@ -1,0 +1,27 @@
+# --- model weights and voice data are never committed -----------------------
+models/*
+!models/.gitkeep
+voices/*
+!voices/.gitkeep
+output/*
+!output/.gitkeep
+
+# --- secrets ----------------------------------------------------------------
+.env
+*.key
+*.pem
+
+# --- python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# --- archives and local scratch --------------------------------------------
+*.tar.gz
+*.zip
+.pip-tmp/
+.pytest-tmp*/
+.test-work/

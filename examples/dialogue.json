@@ -1,0 +1,32 @@
+{
+  "title": "The Little Escape — scene 1, the farmhouse",
+  "mode": "sequential",
+  "gap_s": 0.25,
+  "language": "English",
+  "duration_s": 42.0,
+  "seed": 1942,
+  "metadata": {
+    "project": "cherry-tree-farm",
+    "scene": 1,
+    "source": "plan/cut-250.json"
+  },
+  "lines": [
+    {
+      "speaker": "the-major",
+      "text": "Cock-a-doodle-doo! Step aside, ladies. Frederick Peckle, cock of the walk, is here!"
+    },
+    {
+      "speaker": "petra",
+      "text": "Oh look, Ols! Aren't they adorable? Four of them! They'll keep us busy while we can't go out. How much are they, Mrs Hubbard?",
+      "gap_before_s": 0.4
+    },
+    {
+      "speaker": "mrs-hubbard",
+      "text": "Well... costs have gone up, up, a hundred and twenty pounds cash for all four."
+    },
+    {
+      "speaker": "oliver",
+      "text": "Sorry, Hubbard. What else will we need, and how much would that be?"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "qwen-tts-1.7b",
+  "description": "Qwen3-TTS-12Hz-1.7B-Base voice-clone API for film dialogue. Port 8000.",
+  "image": "ghcr.io/josephatwoosh/qwen-tts-docker:latest",
+  "disk_space": 60,
+  "runtype": "ssh",
+  "ports": ["8000"],
+  "env": {
+    "-p 8000:8000": "1",
+    "TTS_API_KEY": "replace-with-a-long-random-string",
+    "ENGINE": "qwen",
+    "PRELOAD_MODEL": "1",
+    "MODEL_ID": "/models/Qwen3-TTS-12Hz-1.7B-Base",
+    "VOICES_DIR": "/voices",
+    "OUTPUT_DIR": "/output"
+  },
+  "onstart": "qwen-tts-entrypoint serve"
+}
