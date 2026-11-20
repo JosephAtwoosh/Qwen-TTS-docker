@@ -134,6 +134,20 @@ tr '\0' '\n' < /proc/1/environ | grep -E 'TTS_API_KEY|PRELOAD_MODEL'
 If you start the service by hand, export `TTS_API_KEY` in that same command or
 it will run open.
 
+### GPU sampling
+
+`serve` starts `scripts/gpu-probe.sh` automatically. It appends one `nvidia-smi`
+row every `GPU_PROBE_INTERVAL` seconds (default **180**) to
+`/output/gpu-probe.csv`:
+
+```text
+timestamp,name,util_pct,mem_used_mib,mem_total_mib,temp_c,power_w
+2026/11/20 15:14:02.123,NVIDIA GeForce RTX 4090,97,5120,24564,61,318.4
+```
+
+It is independent of the SSH session, so it keeps sampling through the render.
+Set `GPU_PROBE=0` to disable, or `GPU_PROBE_INTERVAL=60` for finer detail.
+
 ## 5. Voices
 
 The repository does not contain voice references. Two ways to get the 29

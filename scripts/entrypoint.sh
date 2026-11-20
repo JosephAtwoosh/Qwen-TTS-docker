@@ -10,6 +10,13 @@ cd /app
 cmd="${1:-serve}"
 case "$cmd" in
   serve)
+    # Sample the GPU for the whole render, not just while an SSH session is up.
+    if [[ "${GPU_PROBE:-1}" == "1" ]] && command -v nvidia-smi >/dev/null 2>&1; then
+      if ! command -v pgrep >/dev/null 2>&1 \
+        || ! pgrep -f '[g]pu-probe.sh' >/dev/null 2>&1; then
+        nohup /app/scripts/gpu-probe.sh >/dev/null 2>&1 &
+      fi
+    fi
     exec python -m app.server
     ;;
   import-voices)
