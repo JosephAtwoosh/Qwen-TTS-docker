@@ -101,6 +101,7 @@ function parseFlags(argv) {
     else if (arg === "--name") flags.name = argv[++i];
     else if (arg === "--json") flags.json = argv[++i];
     else if (arg === "--max-inet") flags.maxInet = Number(argv[++i]);
+    else if (arg === "--transfer-gb") flags.transferGb = Number(argv[++i]);
     else if (arg === "--allow-inet") flags.allowInet = true;
     else flags._.push(arg);
   }
@@ -247,6 +248,7 @@ async function main() {
           disk_gb: Math.round(o.disk_space),
           down_tb: Number(o.downTb.toFixed(2)),
           up_tb: Number(o.upTb.toFixed(2)),
+          xfer10_usd: Number(((10 / 1024) * o.downTb + (1 / 1024) * o.upTb).toFixed(3)),
           mbps: `${Math.round(o.inet_down)}/${Math.round(o.inet_up)}`,
           driver: o.driver_version,
           usd_hr: Number(o.dph_total.toFixed(3)),
@@ -308,6 +310,11 @@ async function main() {
       console.log(
         `offer ${flags.offer}: $${Number(offer.dph_total).toFixed(3)}/h, ` +
           `transfer down $${downTb.toFixed(2)}/TB up $${upTb.toFixed(2)}/TB`,
+      );
+      const transferGb = flags.transferGb ?? 10;
+      console.log(
+        `projected transfer (${transferGb} GB down + 1 GB up): ` +
+          `$${(((transferGb / 1024) * downTb) + ((1 / 1024) * upTb)).toFixed(3)}`,
       );
       if (!flags.allowInet && (downTb >= maxInet || upTb >= maxInet)) {
         console.error(
