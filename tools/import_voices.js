@@ -47,6 +47,7 @@ function parseArgs(argv) {
     pack: false,
     dryRun: false,
     keepRaw: false,
+    noCache: false,
     ffmpeg: process.env.FFMPEG || "ffmpeg",
     transcripts: "",
     elevenKeyFile: process.env.ELEVENLABS_KEY_FILE || "",
@@ -78,6 +79,7 @@ function parseArgs(argv) {
       case "--pack": args.pack = true; break;
       case "--dry-run": args.dryRun = true; break;
       case "--keep-raw": args.keepRaw = true; break;
+      case "--no-cache": args.noCache = true; break;
       case "-h": case "--help": args.help = true; break;
       default: throw new Error(`unknown argument ${a}`);
     }
@@ -439,18 +441,20 @@ async function main() {
         rawPath = dest;
       }
 
-      const audioHash = crypto.createHash("sha256").update(rawBuf).digest("hex").slice(0, 16);
-      const cacheKey = `${voice.voice_id}:${audioHash}`;
       fs.mkdirSync(dir, { recursive: true });
       const tmpWav = path.join(rawDir, `${id}.wav`);
       ffmpegToWav(rawPath, tmpWav, args.maxSeconds);
       fs.copyFileSync(tmpWav, refPath);
       const info = wavInfo(refPath);
+      // Cache on the *processed* reference, not the raw download: changing
+      // --max-seconds changes the audio and must invalidate the transcript.
+      const refHash = hashFile(refPath);
+      const cacheKey = `${voice.voice_id}:${refHash.slice(0, 16)}`;
       if (info.seconds < 2.5) {
         console.warn(`    reference is only ${info.seconds.toFixed(2)}s; cloning will be weak`);
       }
 
-      let transcript = cache[cacheKey];
+      let transcript = args.noCache ? null : cache[cacheKey];
       let backend = "cached";
       if (!transcript) {
         const known = provided[name.toLowerCase()] || provided[id];
@@ -478,7 +482,7 @@ async function main() {
         ref_audio: "ref.wav",
         ref_text: transcript,
         ref_seconds: Number(info.seconds.toFixed(3)),
-        sha256: hashFile(refPath),
+        sha256: refHash,
         description: descriptionParts.join(" · "),
         gender: labels.gender || "",
         tags: [voice.category, labels.accent, labels.use_case].filter(Boolean).map(String),

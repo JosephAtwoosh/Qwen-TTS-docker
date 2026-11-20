@@ -33,15 +33,16 @@ What happens per voice:
 3. ffmpeg: mono, 24 kHz, PCM16, silence trimmed at both ends (reverse-trim for
    the tail — `stop_periods` cuts at the first internal pause, which once turned
    a 20.7 s clip into 0.25 s).
-4. Transcribe (Scribe → Gemini → provided JSON), cache by audio hash in
-   `voices/.transcripts.json`.
+4. Transcribe (Scribe → Gemini → provided JSON), cache by the **processed**
+   reference hash in `voices/.transcripts.json` — so changing `--max-seconds`
+   invalidates the transcript instead of pairing new audio with an old text.
 5. Write `voices/<slug>/profile.json` and `ref.wav`; skip existing voices unless
    `--force`.
 6. `--pack` writes `qwen-voices.tar.gz` (plus `.sha256`) beside `voices/`,
    excluding `.raw` and the transcript cache.
 
 Useful flags: `--dry-run`, `--limit N`, `--source preview|samples|auto`,
-`--max-seconds 60`, `--keep-raw`, `--ffmpeg <path>`.
+`--max-seconds 60`, `--keep-raw`, `--no-cache`, `--ffmpeg <path>`.
 
 The account this was built against has 72 voices: 22 premade, 29 generated
 (the film cast), 21 professional. This repo's pack is the 29 generated voices.
